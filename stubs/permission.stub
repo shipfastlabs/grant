@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Shipfastlabs\Grant\Ability;
+
+enum {{ class }}: string implements Ability
+{
+    case {{ case }} = '{{ value }}';
+
+    public function deniedMessage(): string
+    {
+        return 'You are not allowed to do that.';
+    }
+}

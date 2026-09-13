@@ -3,22 +3,14 @@
 namespace Workbench\App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Workbench\App\Enums\Permission;
+use Workbench\App\Enums\Role;
 
 class WorkbenchServiceProvider extends ServiceProvider
 {
-    /**
-     * Register services.
-     */
     public function register(): void
     {
-        //
-    }
-
-    /**
-     * Bootstrap services.
-     */
-    public function boot(): void
-    {
-        //
+        config()->set('grant.permissions', Permission::class);
+        config()->set('grant.roles', Role::class);
     }
 }

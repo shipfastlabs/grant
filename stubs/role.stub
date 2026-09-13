@@ -1,0 +1,21 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ permissionClass }};
+use Shipfastlabs\Grant\Role as RoleContract;
+
+enum {{ class }}: string implements RoleContract
+{
+    case {{ case }} = '{{ value }}';
+
+    public function permissions(): array
+    {
+        return match ($this) {
+            self::{{ case }} => {{ permission }}::cases(),
+            default => [],
+        };
+    }
+}

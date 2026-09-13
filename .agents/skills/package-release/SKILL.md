@@ -23,15 +23,12 @@ Prepare a safe package release checklist and implementation without tagging, pus
 ## References
 
 - `CHANGELOG.md`
-- `.github/release.yml`
-- `.github/workflows/update-changelog.yml`
 - `.github/workflows/tests.yml`
 - `composer.json`
 
 ## Examples
 
-- Prepare a release by checking changelog coverage, confirming generated release notes categories, running `composer test`, and drafting the tag command for user approval.
-- Update release notes grouping in `.github/release.yml` when a new label convention is added.
+- Prepare a release by checking changelog coverage, running `composer test`, and drafting the tag command for user approval.
 
 ## Anti-Patterns
 

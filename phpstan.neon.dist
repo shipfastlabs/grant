@@ -1,8 +1,8 @@
 parameters:
-    level: 7
+    level: max
     paths:
         - src
-        - config
         - database
-        - routes
+        - tests/Fixtures/User.php
+        - tests/TestCase.php
     tmpDir: build/phpstan

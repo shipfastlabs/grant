@@ -1,8 +1,11 @@
-# Release Notes
+# Changelog
 
-## [Unreleased](https://github.com/:vendor_slug/:package_slug/compare/v0.1.0...1.x)
+All notable changes to this project will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [v0.1.0](https://github.com/:vendor_slug/:package_slug/compare/...v0.1.0) - 202x-xx-xx
+## [Unreleased]
 
-Initial pre-release.
+### Added
+
+- Initial enum-first roles and permissions implementation.

@@ -1,0 +1,21 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Workbench\App\Enums;
+
+use Shipfastlabs\Grant\Role as RoleContract;
+
+enum Role: string implements RoleContract
+{
+    case Admin = 'admin';
+    case Member = 'member';
+
+    public function permissions(): array
+    {
+        return match ($this) {
+            self::Admin => Permission::cases(),
+            self::Member => [],
+        };
+    }
+}
