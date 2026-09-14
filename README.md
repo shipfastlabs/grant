@@ -1,5 +1,11 @@
 # Grant
 
+<p align="center">
+    <a href="https://github.com/shipfastlabs/grant/actions"><img alt="Tests" src="https://github.com/shipfastlabs/grant/actions/workflows/tests.yml/badge.svg"></a>
+    <a href="https://packagist.org/packages/shipfastlabs/grant"><img alt="Latest Version" src="https://img.shields.io/packagist/v/shipfastlabs/grant"></a>
+    <a href="https://packagist.org/packages/shipfastlabs/grant"><img alt="License" src="https://img.shields.io/packagist/l/shipfastlabs/grant"></a>
+</p>
+
 - [Introduction](#introduction)
 - [Installation](#installation)
     - [Publishing Resources](#publishing-resources)
@@ -23,8 +29,8 @@
     - [UUID and ULID Keys](#uuid-and-ulid-keys)
 - [Artisan Commands](#artisan-commands)
 - [Testing](#testing)
-- [Contributing](#contributing)
-- [License](#license)
+- [Development](#development)
+- [Credits](#credits)
 
 ## Introduction
 
@@ -456,16 +462,14 @@ $this->actingAs($user)
     ->assertCan(Permission::EditPosts);
 ```
 
-## Contributing
+## Development
 
-Thank you for considering contributing to Grant. Please review the [contribution guide](.github/CONTRIBUTING.md) before opening a pull request, and run the full test suite before submitting:
-
-```shell
+```bash
 composer test
 ```
 
-Security vulnerabilities should be reported according to the [security policy](.github/SECURITY.md).
+Please review the [contribution guide](CONTRIBUTING.md) before opening a pull request. Security issues should follow the [security policy](SECURITY.md).
 
-## License
+## Credits
 
-Grant is open-sourced software licensed under the [MIT license](LICENSE.md).
+Grant is maintained by [Shipfastlabs](https://shipfastlabs.com) and released under the [MIT license](LICENSE.md).

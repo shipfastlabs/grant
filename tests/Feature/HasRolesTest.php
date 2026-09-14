@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Gate;
+use Shipfastlabs\Grant\Exceptions\ColumnStorageException;
+use Shipfastlabs\Grant\Exceptions\InvalidConfigurationException;
+use Shipfastlabs\Grant\Exceptions\UnsavedModelException;
 use Shipfastlabs\Grant\Facades\Grant;
 use Shipfastlabs\Grant\Models\RoleAssignment;
 use Shipfastlabs\Grant\Tests\Fixtures\Permission;
@@ -11,7 +14,7 @@ use Shipfastlabs\Grant\Tests\Fixtures\Role;
 use Shipfastlabs\Grant\Tests\Fixtures\Team;
 use Shipfastlabs\Grant\Tests\Fixtures\User;
 
-it('assigns, revokes, and synchronizes global roles', function () {
+it('assigns, revokes, and synchronizes global roles', function (): void {
     $user = User::query()->create(['name' => 'Taylor']);
 
     $user->grant(Role::Editor)->grant(Role::Viewer);
@@ -61,10 +64,10 @@ it('uses the configured assignment model and rejects other classes', function ()
     config()->set('grant.model', Team::class);
 
     expect(fn () => $user->roles())
-        ->toThrow(InvalidArgumentException::class, 'grant.model');
+        ->toThrow(InvalidConfigurationException::class, 'grant.model');
 });
 
-it('keeps scoped roles separate and falls back to global permissions', function () {
+it('keeps scoped roles separate and falls back to global permissions', function (): void {
     $user = User::query()->create(['name' => 'Taylor']);
     $firstTeam = Team::query()->create(['name' => 'First']);
     $secondTeam = Team::query()->create(['name' => 'Second']);
@@ -78,7 +81,7 @@ it('keeps scoped roles separate and falls back to global permissions', function 
         ->and($user->permissions(on: $secondTeam)->all())->toBe([Permission::ViewReports]);
 });
 
-it('registers native Gate abilities with denial messages and scoped resolution', function () {
+it('registers native Gate abilities with denial messages and scoped resolution', function (): void {
     $user = User::query()->create(['name' => 'Taylor']);
     $team = Team::query()->create(['name' => 'First']);
     $user->grant(Role::Editor, on: $team);
@@ -98,7 +101,7 @@ it('denies instead of throwing for non-model gate arguments and unsaved models',
         ->and(Gate::forUser(new User)->allows(Permission::ViewReports))->toBeFalse();
 });
 
-it('supports a single global role in column storage', function () {
+it('supports a single global role in column storage', function (): void {
     config()->set('grant.storage', 'column');
     $user = User::query()->create(['name' => 'Taylor']);
     $user->mergeCasts(['role' => Role::class]);
@@ -121,16 +124,16 @@ it('rejects multiple or scoped roles in column storage', function (): void {
     $team = Team::query()->create(['name' => 'First']);
 
     expect(fn () => $user->syncRoles([Role::Editor, Role::Viewer]))
-        ->toThrow(InvalidArgumentException::class, 'only one role')
+        ->toThrow(ColumnStorageException::class, 'only one role')
         ->and(fn () => $user->grant(Role::Editor, on: $team))
-        ->toThrow(InvalidArgumentException::class, 'does not support scoped roles');
+        ->toThrow(ColumnStorageException::class, 'does not support scoped roles');
 });
 
 it('rejects unsaved scopes', function (): void {
     $user = User::query()->create(['name' => 'Taylor']);
 
     expect(fn () => $user->grant(Role::Editor, on: new Team))
-        ->toThrow(InvalidArgumentException::class, 'persisted Eloquent model');
+        ->toThrow(UnsavedModelException::class, 'persisted Eloquent model');
 });
 
 it('supports facade assignments, factory states, and test helpers', function (): void {

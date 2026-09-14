@@ -6,3 +6,5 @@ parameters:
         - tests/Fixtures/User.php
         - tests/TestCase.php
     tmpDir: build/phpstan
+
+    reportUnmatchedIgnoredErrors: true

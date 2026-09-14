@@ -69,6 +69,7 @@ it('adds a kebab-cased case to a configured enum', function (): void {
     PHP;
 
     file_put_contents($path, $source);
+
     require $path;
     config()->set('grant.permissions', $class);
 

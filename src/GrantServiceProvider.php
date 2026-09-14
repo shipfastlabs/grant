@@ -111,11 +111,9 @@ final class GrantServiceProvider extends ServiceProvider
 
     private function registerFactoryState(): void
     {
-        Factory::macro('role', function (Role $role, ?Model $on = null) {
-            return $this->afterCreating(static function (Model $user) use ($role, $on): void {
-                app(Grant::class)->grant($user, $role, $on);
-            });
-        });
+        Factory::macro('role', fn (Role $role, ?Model $on = null) => $this->afterCreating(static function (Model $user) use ($role, $on): void {
+            app(Grant::class)->grant($user, $role, $on);
+        }));
     }
 
     private function registerCommands(): void

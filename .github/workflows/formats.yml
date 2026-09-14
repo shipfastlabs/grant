@@ -34,11 +34,14 @@ jobs:
       - name: Install dependencies
         run: composer update --prefer-stable --prefer-dist --no-interaction --no-progress
 
-      - name: Linter
-        run: composer lint:check
+      - name: Coding Style Checks
+        run: composer test:lint
 
-      - name: PHPStan
-        run: composer analyse
-
-      - name: Type Coverage
+      - name: Type Checks
         run: composer test:types
+
+      - name: Type Coverage Checks
+        run: composer test:type-coverage
+
+      - name: Refactor Checks
+        run: composer test:refactor

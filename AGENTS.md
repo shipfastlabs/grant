@@ -13,8 +13,10 @@ This repository is a Laravel package. Keep the package focused, idiomatic, and e
 ## Quick Commands
 
 - Full validation: `composer test`
-- Formatting check: `composer lint:check`
-- Static analysis: `composer analyse`
+- Formatting check: `composer test:lint`
+- Static analysis: `composer test:types`
+- Type coverage: `composer test:type-coverage`
+- Refactor check: `composer test:refactor`
 - Pest tests: `composer test:unit`
 - Workbench build: `composer build`
 - Workbench server: `composer serve`

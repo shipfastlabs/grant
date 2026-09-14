@@ -6,7 +6,6 @@ namespace Shipfastlabs\Grant\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
-use InvalidArgumentException;
 use Shipfastlabs\Grant\Ability;
 use Shipfastlabs\Grant\Grant;
 use Shipfastlabs\Grant\Role;
@@ -50,13 +49,13 @@ final class ShowCommand extends Command
         }
 
         if (! is_string($scope)) {
-            throw new InvalidArgumentException('The --on option must use ModelClass:id.');
+            $this->fail('The --on option must use ModelClass:id.');
         }
 
         [$class, $id] = array_pad(explode(':', $scope, 2), 2, '');
 
         if ($id === '' || ! is_subclass_of($class, Model::class)) {
-            throw new InvalidArgumentException('The --on option must use ModelClass:id.');
+            $this->fail('The --on option must use ModelClass:id.');
         }
 
         return $class::query()->findOrFail($id);

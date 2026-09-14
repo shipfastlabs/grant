@@ -7,7 +7,6 @@ namespace Shipfastlabs\Grant\Testing;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
-use LogicException;
 use PHPUnit\Framework\Assert;
 use Shipfastlabs\Grant\Ability;
 use Shipfastlabs\Grant\Grant;
@@ -34,7 +33,7 @@ trait InteractsWithGrant
         $user = Auth::user();
 
         if (! $user instanceof Model) {
-            throw new LogicException('The authenticated user must be an Eloquent model.');
+            Assert::fail('The authenticated user must be an Eloquent model.');
         }
 
         app(Grant::class)->grant($user, $role, $on);

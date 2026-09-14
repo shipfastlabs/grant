@@ -14,8 +14,13 @@ use Shipfastlabs\Grant\HasRoles;
 
 class User extends Model implements AuthenticatableContract, AuthorizableContract
 {
+    use Authenticatable;
+    use Authorizable;
+
     /** @use HasFactory<UserFactory> */
-    use Authenticatable, Authorizable, HasFactory, HasRoles;
+    use HasFactory;
+
+    use HasRoles;
 
     public $timestamps = false;
 

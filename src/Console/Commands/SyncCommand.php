@@ -6,7 +6,6 @@ namespace Shipfastlabs\Grant\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
-use InvalidArgumentException;
 use Shipfastlabs\Grant\Grant;
 use Shipfastlabs\Grant\Role;
 
@@ -91,7 +90,7 @@ final class SyncCommand extends Command
         $userClass = config('auth.providers.users.model');
 
         if (! is_string($userClass) || ! is_subclass_of($userClass, Model::class)) {
-            throw new InvalidArgumentException('The auth user model could not be resolved.');
+            $this->fail('The auth user model could not be resolved.');
         }
 
         return $userClass;

@@ -7,8 +7,10 @@ namespace Shipfastlabs\Grant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use InvalidArgumentException;
 use ReflectionEnum;
+use Shipfastlabs\Grant\Exceptions\ColumnStorageException;
+use Shipfastlabs\Grant\Exceptions\InvalidConfigurationException;
+use Shipfastlabs\Grant\Exceptions\UnsavedModelException;
 use Shipfastlabs\Grant\Models\RoleAssignment;
 
 final class Grant
@@ -46,7 +48,7 @@ final class Grant
 
         if ($this->usesRoleColumn($on)) {
             if ($roles->count() > 1) {
-                throw new InvalidArgumentException('Column storage supports only one role.');
+                throw ColumnStorageException::multipleRoles();
             }
 
             return $this->writeColumn($user, $roles->first()?->value);
@@ -87,7 +89,7 @@ final class Grant
     {
         $roles = $this->roles($user);
 
-        if ($on !== null && ! $this->usesRoleColumn()) {
+        if ($on instanceof Model && ! $this->usesRoleColumn()) {
             $roles = $roles->merge($this->roles($user, $on));
         }
 
@@ -115,7 +117,7 @@ final class Grant
         $model = config('grant.model');
 
         if (! is_string($model) || ! is_a($model, RoleAssignment::class, true)) {
-            throw new InvalidArgumentException('The grant.model config value must be '.RoleAssignment::class.' or a subclass.');
+            throw InvalidConfigurationException::model(RoleAssignment::class);
         }
 
         return $model;
@@ -127,9 +129,9 @@ final class Grant
         $this->assertPersisted($user, $on);
         $query = $this->assignmentModel()::query()->where('user_id', $user->getKey());
 
-        return $on === null
-            ? $query->whereNull('scopeable_type')->whereNull('scopeable_id')
-            : $query->where('scopeable_type', $on->getMorphClass())->where('scopeable_id', $on->getKey());
+        return $on instanceof Model
+            ? $query->where('scopeable_type', $on->getMorphClass())->where('scopeable_id', $on->getKey())
+            : $query->whereNull('scopeable_type')->whereNull('scopeable_id');
     }
 
     /** @return array<string, mixed> */
@@ -171,11 +173,11 @@ final class Grant
         $enum = config("grant.{$key}");
 
         if (! is_string($enum) || ! is_subclass_of($enum, $interface)) {
-            throw new InvalidArgumentException("The grant.{$key} config value must be a backed enum implementing {$interface}.");
+            throw InvalidConfigurationException::enum($key, $interface);
         }
 
         if ((string) (new ReflectionEnum($enum))->getBackingType() !== 'string') {
-            throw new InvalidArgumentException("The grant.{$key} enum must be string-backed.");
+            throw InvalidConfigurationException::backingType($key);
         }
 
         return $enum;
@@ -187,8 +189,8 @@ final class Grant
             return false;
         }
 
-        if ($on !== null) {
-            throw new InvalidArgumentException('Column storage does not support scoped roles.');
+        if ($on instanceof Model) {
+            throw ColumnStorageException::scoped();
         }
 
         return true;
@@ -197,11 +199,11 @@ final class Grant
     private function assertPersisted(Model $user, ?Model $on): void
     {
         if (! $user->exists) {
-            throw new InvalidArgumentException('Roles can only be assigned to persisted users.');
+            throw UnsavedModelException::user();
         }
 
-        if ($on !== null && ! $on->exists) {
-            throw new InvalidArgumentException('Scoped roles require a persisted Eloquent model as the scope.');
+        if ($on instanceof Model && ! $on->exists) {
+            throw UnsavedModelException::scope();
         }
     }
 }
