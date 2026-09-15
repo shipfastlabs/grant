@@ -56,3 +56,4 @@ For tests, add `Shipfastlabs\Grant\Testing\InteractsWithGrant` to the base test 
 - Do not put ownership or model-state rules in role definitions; keep them in Policies.
 - Assignments are memoized per user for the request (scoped binding). Grant writes and `RoleAssignment` model events clear it; after bulk query builder writes call `Grant::flush($user)`.
 - The super-admin bypass only applies to the role granted globally, never scoped.
+- No admin plugin: manage roles in Filament with a multiple `Select` bound to `roles()` and `syncRoles()`; see the README section.

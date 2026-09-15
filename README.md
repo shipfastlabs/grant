@@ -32,6 +32,7 @@
     - [Customizing the Assignment Model](#customizing-the-assignment-model)
     - [UUID and ULID Keys](#uuid-and-ulid-keys)
 - [Artisan Commands](#artisan-commands)
+- [Managing Roles in Filament](#managing-roles-in-filament)
 - [Testing](#testing)
 - [Development](#development)
 - [Credits](#credits)
@@ -432,6 +433,29 @@ php artisan grant:sync
 ```
 
 To add a permission or role, add a case to the enum. After adding a role, remember to map its permissions in `Role::permissions`.
+
+## Managing Roles in Filament
+
+Grant ships no admin panel plugin because there is nothing to manage except which roles a user holds, and Filament handles string-backed enums natively. Add a `Select` to your user resource form that reads from `roles()` and writes through `syncRoles()`:
+
+```php
+use App\Enums\Role;
+use App\Models\User;
+use Filament\Forms\Components\Select;
+
+Select::make('roles')
+    ->multiple()
+    ->options(Role::class)
+    ->dehydrated(false)
+    ->afterStateHydrated(fn (Select $component, ?User $record) => $component->state(
+        $record?->roles()->map->value->all() ?? [],
+    ))
+    ->saveRelationshipsUsing(fn (User $record, array $state) => $record->syncRoles(
+        array_map(Role::from(...), $state),
+    )),
+```
+
+Implement Filament's `HasLabel` interface on your role enum to control the option labels. For scoped roles, wrap the same select in a `Repeater` alongside a select for the scope model and call `syncRoles` with the `on` argument for each entry.
 
 ## Testing
 
