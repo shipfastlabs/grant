@@ -49,21 +49,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Role Storage
-    |--------------------------------------------------------------------------
-    |
-    | Supported: "pivot", "column"
-    |
-    | The "pivot" driver stores assignments within the role_assignments table and
-    | supports multiple roles per user as well as scoped roles. The "column"
-    | driver keeps one global role in a role column on the model itself.
-    |
-    */
-
-    'storage' => 'pivot',
-
-    /*
-    |--------------------------------------------------------------------------
     | Assignment Model
     |--------------------------------------------------------------------------
     |

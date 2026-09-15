@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Shipfastlabs\Grant\Exceptions\ColumnStorageException;
 use Shipfastlabs\Grant\Exceptions\InvalidConfigurationException;
 use Shipfastlabs\Grant\Exceptions\UnsavedModelException;
 use Shipfastlabs\Grant\Facades\Grant;
@@ -62,6 +62,7 @@ it('uses the configured assignment model and rejects other classes', function ()
         ->and($user->roles()->all())->toBe([Role::Editor]);
 
     config()->set('grant.model', Team::class);
+    Grant::flush();
 
     expect(fn () => $user->roles())
         ->toThrow(InvalidConfigurationException::class, 'grant.model');
@@ -79,6 +80,37 @@ it('keeps scoped roles separate and falls back to global permissions', function 
         ->and($user->roles(on: $secondTeam))->toBeEmpty()
         ->and($user->permissions(on: $firstTeam)->all())->toEqualCanonicalizing(Permission::cases())
         ->and($user->permissions(on: $secondTeam)->all())->toBe([Permission::ViewReports]);
+});
+
+it('reads assignments once per request and forgets them on every write path', function (): void {
+    $user = User::query()->create(['name' => 'Taylor']);
+    $team = Team::query()->create(['name' => 'First']);
+    $user->grant(Role::Viewer)->grant(Role::Editor, on: $team);
+
+    DB::enableQueryLog();
+    $user->roles();
+    DB::flushQueryLog();
+
+    expect($user->roles()->all())->toBe([Role::Viewer])
+        ->and($user->roles(on: $team)->all())->toBe([Role::Editor])
+        ->and(Gate::forUser($user)->allows(Permission::EditPosts, $team))->toBeTrue()
+        ->and(User::query()->find($user->getKey())?->hasRole(Role::Viewer))->toBeTrue()
+        ->and(DB::getQueryLog())->toHaveCount(1);
+
+    $user->syncRoles([Role::Admin]);
+    expect($user->roles()->all())->toBe([Role::Admin]);
+
+    RoleAssignment::query()->where('user_id', $user->getKey())->first()?->delete();
+    expect($user->roles())->toBeEmpty();
+
+    RoleAssignment::query()->create(['user_id' => $user->getKey(), 'role' => 'editor']);
+    expect($user->roles()->all())->toBe([Role::Editor]);
+
+    RoleAssignment::query()->where('user_id', $user->getKey())->update(['role' => 'viewer']);
+    expect($user->roles()->all())->toBe([Role::Editor]);
+
+    Grant::flush($user);
+    expect($user->roles()->all())->toBe([Role::Viewer]);
 });
 
 it('registers native Gate abilities with denial messages and scoped resolution', function (): void {
@@ -101,34 +133,6 @@ it('denies instead of throwing for non-model gate arguments and unsaved models',
         ->and(Gate::forUser(new User)->allows(Permission::ViewReports))->toBeFalse();
 });
 
-it('supports a single global role in column storage', function (): void {
-    config()->set('grant.storage', 'column');
-    $user = User::query()->create(['name' => 'Taylor']);
-    $user->mergeCasts(['role' => Role::class]);
-
-    $user->grant(Role::Editor);
-
-    expect($user->roles()->all())->toBe([Role::Editor])
-        ->and($user->fresh()->roles()->all())->toBe([Role::Editor]);
-
-    $user->syncRoles([Role::Viewer]);
-    expect($user->fresh()->roles()->all())->toBe([Role::Viewer]);
-
-    $user->revoke(Role::Viewer);
-    expect($user->fresh()->roles())->toBeEmpty();
-});
-
-it('rejects multiple or scoped roles in column storage', function (): void {
-    config()->set('grant.storage', 'column');
-    $user = User::query()->create(['name' => 'Taylor']);
-    $team = Team::query()->create(['name' => 'First']);
-
-    expect(fn () => $user->syncRoles([Role::Editor, Role::Viewer]))
-        ->toThrow(ColumnStorageException::class, 'only one role')
-        ->and(fn () => $user->grant(Role::Editor, on: $team))
-        ->toThrow(ColumnStorageException::class, 'does not support scoped roles');
-});
-
 it('rejects unsaved scopes', function (): void {
     $user = User::query()->create(['name' => 'Taylor']);
 
@@ -136,8 +140,9 @@ it('rejects unsaved scopes', function (): void {
         ->toThrow(UnsavedModelException::class, 'persisted Eloquent model');
 });
 
-it('supports facade assignments, factory states, and test helpers', function (): void {
-    $user = User::factory()->role(Role::Viewer)->create();
+it('supports facade assignments and test helpers', function (): void {
+    $user = User::factory()->create();
+    Grant::grant($user, Role::Viewer);
     Grant::revoke($user, Role::Viewer);
 
     $this->actingAs($user)

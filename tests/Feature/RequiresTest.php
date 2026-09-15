@@ -26,3 +26,10 @@ it('requires the attributed permission and still runs the policy', function (): 
     $other->grant(Role::Editor);
     expect(Gate::forUser($other)->allows('update', $post))->toBeFalse();
 });
+
+it('does not recurse when the attribute names the policy ability itself', function (): void {
+    $user = User::query()->create(['name' => 'Viewer']);
+    $user->grant(Role::Viewer);
+
+    expect(Gate::forUser($user)->allows('view-reports', new Post))->toBeTrue();
+});

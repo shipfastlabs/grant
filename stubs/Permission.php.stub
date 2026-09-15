@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace {{ namespace }};
+namespace App\Enums;
 
 use Shipfastlabs\Grant\Ability;
 
-enum {{ class }}: string implements Ability
+enum Permission: string implements Ability
 {
-    case {{ case }} = '{{ value }}';
+    case Example = 'example';
 
     public function deniedMessage(): string
     {

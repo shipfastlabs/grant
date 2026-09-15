@@ -8,35 +8,31 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use ReflectionEnum;
-use Shipfastlabs\Grant\Exceptions\ColumnStorageException;
 use Shipfastlabs\Grant\Exceptions\InvalidConfigurationException;
 use Shipfastlabs\Grant\Exceptions\UnsavedModelException;
 use Shipfastlabs\Grant\Models\RoleAssignment;
 
 final class Grant
 {
+    /**
+     * @var array<string, Collection<int, RoleAssignment>>
+     */
+    private array $assignments = [];
+
     public function grant(Model $user, Role $role, ?Model $on = null): Model
     {
-        if ($this->usesRoleColumn($on)) {
-            return $this->writeColumn($user, $role->value);
-        }
-
         $this->assignmentModel()::query()->firstOrCreate($this->assignmentAttributes($user, $role, $on));
+
+        $this->flush($user);
 
         return $user;
     }
 
     public function revoke(Model $user, Role $role, ?Model $on = null): Model
     {
-        if ($this->usesRoleColumn($on)) {
-            if ($this->columnValue($user) === $role->value) {
-                $this->writeColumn($user, null);
-            }
-
-            return $user;
-        }
-
         $this->assignmentQuery($user, $on)->where('role', $role->value)->delete();
+
+        $this->flush($user);
 
         return $user;
     }
@@ -44,22 +40,17 @@ final class Grant
     /** @param iterable<Role> $roles */
     public function syncRoles(Model $user, iterable $roles, ?Model $on = null): Model
     {
-        $roles = collect([...$roles])->unique(static fn (Role $role): string => $role->value)->values();
-
-        if ($this->usesRoleColumn($on)) {
-            if ($roles->count() > 1) {
-                throw ColumnStorageException::multipleRoles();
-            }
-
-            return $this->writeColumn($user, $roles->first()?->value);
-        }
-
-        $rows = $roles->map(fn (Role $role): array => $this->assignmentAttributes($user, $role, $on))->all();
+        $rows = collect([...$roles])
+            ->unique(static fn (Role $role): string => $role->value)
+            ->map(fn (Role $role): array => $this->assignmentAttributes($user, $role, $on))
+            ->all();
 
         $user->getConnection()->transaction(function () use ($user, $rows, $on): void {
             $this->assignmentQuery($user, $on)->delete();
             $this->assignmentModel()::query()->insert($rows);
         });
+
+        $this->flush($user);
 
         return $user;
     }
@@ -74,9 +65,11 @@ final class Grant
     {
         $roleClass = $this->roleClass();
 
-        $values = $this->usesRoleColumn($on)
-            ? [$this->columnValue($user)]
-            : $this->assignmentQuery($user, $on)->pluck('role')->all();
+        $values = $this->assignments($user, $on)
+            ->where('scopeable_type', $on?->getMorphClass())
+            ->where('scopeable_id', $on?->getKey())
+            ->pluck('role')
+            ->all();
 
         return collect($values)
             ->map(static fn (mixed $value): ?Role => is_string($value) ? $roleClass::tryFrom($value) : null)
@@ -89,7 +82,7 @@ final class Grant
     {
         $roles = $this->roles($user);
 
-        if ($on instanceof Model && ! $this->usesRoleColumn()) {
+        if ($on instanceof Model) {
             $roles = $roles->merge($this->roles($user, $on));
         }
 
@@ -147,19 +140,32 @@ final class Grant
         ];
     }
 
-    private function writeColumn(Model $user, ?string $value): Model
+    public function flush(Model|int|string|null $user = null): void
     {
-        $user->setAttribute('role', $value);
-        $user->save();
+        if ($user === null) {
+            $this->assignments = [];
 
-        return $user;
+            return;
+        }
+
+        unset($this->assignments[$this->memoKey($user)]);
     }
 
-    private function columnValue(Model $user): mixed
+    private function memoKey(Model|int|string $user): string
     {
-        $value = $user->getAttribute('role');
+        $key = $user instanceof Model ? $user->getKey() : $user;
 
-        return $value instanceof Role ? $value->value : $value;
+        return is_scalar($key) ? (string) $key : serialize($key);
+    }
+
+    /** @return Collection<int, RoleAssignment> */
+    private function assignments(Model $user, ?Model $on): Collection
+    {
+        $this->assertPersisted($user, $on);
+
+        return $this->assignments[$this->memoKey($user)] ??= $this->assignmentModel()::query()
+            ->where('user_id', $user->getKey())
+            ->get();
     }
 
     /**
@@ -181,19 +187,6 @@ final class Grant
         }
 
         return $enum;
-    }
-
-    private function usesRoleColumn(?Model $on = null): bool
-    {
-        if (config('grant.storage') !== 'column') {
-            return false;
-        }
-
-        if ($on instanceof Model) {
-            throw ColumnStorageException::scoped();
-        }
-
-        return true;
     }
 
     private function assertPersisted(Model $user, ?Model $on): void

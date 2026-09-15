@@ -35,7 +35,6 @@ abstract class TestCase extends Orchestra
         Schema::create('users', function (Blueprint $table): void {
             $table->id();
             $table->string('name');
-            $table->string('role')->nullable();
         });
 
         Schema::create('teams', function (Blueprint $table): void {

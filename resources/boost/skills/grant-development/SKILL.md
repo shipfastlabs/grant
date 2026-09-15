@@ -27,15 +27,14 @@ Apply `shipfastlabs/grant` while keeping every authorization check in Laravel's 
 
 ## References
 
-- `config/grant.php` — enum classes, super-admin role, storage mode, and the assignment model class
+- `config/grant.php` — enum classes, super-admin role, and the assignment model class
 - `app/Enums/Permission.php` and `app/Enums/Role.php` — application definitions
 - `php artisan grant:list` — registered permissions
 - `php artisan grant:show {user} --on='ModelClass:id'` — resolved assignments
 - `php artisan grant:sync` — after changing a role's value or removing a case, remap or delete the stored assignments that no longer match; `--no-interaction` only reports them and fails
 - `Shipfastlabs\Grant\Models\RoleAssignment` — Eloquent model for `role_assignments`, extend it and set `grant.model` to customize; `$user->roleAssignments` exposes the rows
-- `php artisan make:permission {Name}` / `php artisan make:role {Name}` — append a kebab-cased string case to the configured enum, generating it from the stub when missing
 - `Shipfastlabs\Grant\Facades\Grant` — `grant`, `revoke`, `syncRoles`, `hasRole`, `roles`, `permissions` when a model method is not convenient
-- Publish tags: `grant` (everything), `grant-config`, `grant-migrations`, `grant-stubs`
+- Publish tags: `grant` (everything), `grant-config`, `grant-migrations`
 
 ## Examples
 
@@ -47,7 +46,7 @@ $user->can(Permission::EditPosts);
 $user->can(Permission::EditPosts, $team); // scoped roles fall back to global roles
 ```
 
-For tests, add `Shipfastlabs\Grant\Testing\InteractsWithGrant` to the base test case, then use `assertCan`, `assertCannot`, and `withRole`. Factories support `->role(Role::Editor, on: $team)`.
+For tests, add `Shipfastlabs\Grant\Testing\InteractsWithGrant` to the base test case, then use `assertCan`, `assertCannot`, and `withRole`. Add a factory state that calls `grant()` in `afterCreating` to seed roles.
 
 ## Anti-patterns
 
@@ -55,4 +54,5 @@ For tests, add `Shipfastlabs\Grant\Testing\InteractsWithGrant` to the base test 
 - Do not check roles for authorization; check permissions.
 - Do not store role or permission definitions in the database.
 - Do not put ownership or model-state rules in role definitions; keep them in Policies.
-- Do not use scoped or multiple roles with `storage => column`.
+- Assignments are memoized per user for the request (scoped binding). Grant writes and `RoleAssignment` model events clear it; after bulk query builder writes call `Grant::flush($user)`.
+- The super-admin bypass only applies to the role granted globally, never scoped.

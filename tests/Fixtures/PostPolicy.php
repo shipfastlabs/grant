@@ -13,4 +13,10 @@ class PostPolicy
     {
         return $post->getAttribute('author_id') === $user->getKey();
     }
+
+    #[Requires(Permission::ViewReports)]
+    public function viewReports(User $user, Post $post): bool
+    {
+        return true;
+    }
 }

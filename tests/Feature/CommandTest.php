@@ -32,63 +32,6 @@ it('shows a user’s roles and resolved permissions', function (): void {
         ->assertSuccessful();
 });
 
-it('generates the enum from the stub when it does not exist yet', function (): void {
-    $class = 'App\\Enums\\Role'.bin2hex(random_bytes(6));
-    $path = app_path('Enums/'.class_basename($class).'.php');
-    config()->set('grant.roles', $class);
-    config()->set('grant.permissions', 'App\\Enums\\Permission');
-
-    try {
-        $this->artisan('make:role', ['name' => 'admin'])
-            ->expectsOutputToContain('created successfully')
-            ->assertSuccessful();
-
-        expect(file_get_contents($path))
-            ->toContain('namespace App\\Enums;')
-            ->toContain('use App\\Enums\\Permission;')
-            ->toContain('enum '.class_basename($class).': string implements RoleContract')
-            ->toContain("case Admin = 'admin';")
-            ->toContain('self::Admin => Permission::cases(),')
-            ->toContain('default => [],');
-    } finally {
-        @unlink($path);
-    }
-});
-
-it('adds a kebab-cased case to a configured enum', function (): void {
-    $class = 'Permission'.bin2hex(random_bytes(6));
-    $path = sys_get_temp_dir()."/{$class}.php";
-    $source = <<<PHP
-    <?php
-    enum {$class}: string implements \\Shipfastlabs\\Grant\\Ability
-    {
-        case Existing = 'existing';
-        public function deniedMessage(): string { return 'Denied'; }
-    }
-    function {$class}_helper(): void {}
-    PHP;
-
-    file_put_contents($path, $source);
-
-    require $path;
-    config()->set('grant.permissions', $class);
-
-    try {
-        $this->artisan('make:permission', ['name' => 'Publish Posts'])
-            ->expectsOutputToContain("Added PublishPosts to {$class}.")
-            ->assertSuccessful();
-
-        expect(file_get_contents($path))
-            ->toContain("case PublishPosts = 'publish-posts';\n}\nfunction {$class}_helper");
-
-        $this->artisan('make:permission', ['name' => 'existing'])
-            ->expectsOutputToContain('already exists')
-            ->assertFailed();
-    } finally {
-        @unlink($path);
-    }
-});
-
 it('remaps or deletes stored roles that no longer match the enum', function (): void {
     $user = User::query()->create(['name' => 'Taylor']);
     $other = User::query()->create(['name' => 'Other']);
@@ -119,22 +62,24 @@ it('remaps or deletes stored roles that no longer match the enum', function (): 
         ->assertSuccessful();
 });
 
-it('syncs the role column in column storage', function (): void {
-    config()->set('grant.storage', 'column');
-    $user = User::query()->create(['name' => 'Taylor', 'role' => 'legacy']);
+it('installs the config, migration, and starter enums', function (): void {
+    config()->set('grant.permissions', 'App\\Enums\\Permission');
+    config()->set('grant.roles', 'App\\Enums\\Role');
 
-    $this->artisan('grant:sync')
-        ->expectsQuestion('Stored role [legacy] no longer exists. What should its 1 assignments become?', 'viewer')
-        ->assertSuccessful();
+    try {
+        $this->artisan('grant:install')->assertSuccessful();
 
-    expect($user->fresh()?->roles()->all())->toBe([Role::Viewer]);
-
-    $user->forceFill(['role' => 'dropped'])->save();
-
-    $this->artisan('grant:sync')
-        ->expectsQuestion('Stored role [dropped] no longer exists. What should its 1 assignments become?', '__delete')
-        ->assertSuccessful();
-
-    expect(User::query()->count())->toBe(1)
-        ->and($user->fresh()?->roles())->toBeEmpty();
+        expect(file_get_contents(app_path('Enums/Permission.php')))
+            ->toContain('namespace App\\Enums;')
+            ->toContain('enum Permission: string implements Ability')
+            ->and(file_get_contents(app_path('Enums/Role.php')))
+            ->toContain('enum Role: string implements RoleContract')
+            ->toContain('self::Admin => Permission::cases(),')
+            ->and(file_exists(config_path('grant.php')))->toBeTrue();
+    } finally {
+        @unlink(app_path('Enums/Permission.php'));
+        @unlink(app_path('Enums/Role.php'));
+        @unlink(config_path('grant.php'));
+        array_map(unlink(...), glob(database_path('migrations/*_create_role_assignments_table.php')) ?: []);
+    }
 });

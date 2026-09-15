@@ -22,6 +22,7 @@
     - [Preparing Your User Model](#preparing-your-user-model)
     - [Granting and Revoking Roles](#granting-and-revoking-roles)
     - [Scoped Roles](#scoped-roles)
+    - [Caching](#caching)
     - [The Grant Facade](#the-grant-facade)
 - [Authorizing Actions](#authorizing-actions)
     - [Via the Gate](#via-the-gate)
@@ -29,7 +30,6 @@
     - [Super Admins](#super-admins)
 - [Configuration](#configuration)
     - [Customizing the Assignment Model](#customizing-the-assignment-model)
-    - [Column Storage](#column-storage)
     - [UUID and ULID Keys](#uuid-and-ulid-keys)
 - [Artisan Commands](#artisan-commands)
 - [Testing](#testing)
@@ -58,7 +58,7 @@ You may install Grant via the Composer package manager:
 composer require shipfastlabs/grant
 ```
 
-Next, run the `grant:install` Artisan command. This command publishes Grant's configuration file and migration, then creates `app/Enums/Permission.php` and `app/Enums/Role.php` with `Admin` and `Member` roles:
+Next, run the `grant:install` Artisan command. This command publishes Grant's configuration file and migration, then creates starter `app/Enums/Permission.php` and `app/Enums/Role.php` enums if they do not exist yet:
 
 ```shell
 php artisan grant:install
@@ -75,10 +75,7 @@ The install command publishes everything you need. If you would like to publish 
 ```shell
 php artisan vendor:publish --tag=grant-config
 php artisan vendor:publish --tag=grant-migrations
-php artisan vendor:publish --tag=grant-stubs
 ```
-
-The `grant-stubs` tag copies `permission.stub` and `role.stub` into your application's `stubs` directory. The `make:permission` and `make:role` commands will use your customized stubs when generating enums.
 
 ## Defining Permissions and Roles
 
@@ -268,6 +265,22 @@ $user->can(Permission::EditPosts, $team);
 $user->permissions(on: $team);
 ```
 
+### Caching
+
+Grant reads a user's assignments from the database once per request and answers every later `roles`, `hasRole`, `permissions`, and `can` call for that user from memory, whether global or scoped. A page that authorizes fifty models in a loop costs one query, and no eager loading is needed.
+
+The memo lives only for the current request. Under Octane it is cleared per request and in queue workers per job, so it never leaks between users or jobs. Granting, revoking, or syncing roles through Grant, and saving or deleting a `RoleAssignment` model, clear the affected user. Only bulk query builder writes bypass it. After one of those, or whenever you want a fresh read, flush explicitly:
+
+```php
+use Shipfastlabs\Grant\Facades\Grant;
+
+Grant::flush($user); // one user
+
+Grant::flush();      // everyone
+```
+
+Grant does not cache across requests. Definitions already live in code, so the only thing left to cache would be one indexed query per user per request.
+
 ### The Grant Facade
 
 The `Grant` facade exposes the same assignment operations for situations where calling a method on the model is not convenient. The facade never performs authorization checks:
@@ -360,16 +373,17 @@ You may designate one role as a super admin in your configuration file. Users ho
 
 Set the option to `null` to disable the bypass entirely.
 
+Only a globally granted super admin role bypasses the Gate. Granting the role scoped to a model, such as `on: $team`, makes the user an ordinary holder of that role's permissions on that team.
+
 ## Configuration
 
-Grant's configuration file is published to `config/grant.php` and contains five options:
+Grant's configuration file is published to `config/grant.php` and contains four options:
 
 ```php
 return [
     'roles' => App\Enums\Role::class,
     'permissions' => App\Enums\Permission::class,
     'super_admin' => null,
-    'storage' => 'pivot',
     'model' => Shipfastlabs\Grant\Models\RoleAssignment::class,
 ];
 ```
@@ -397,19 +411,6 @@ class RoleAssignment extends BaseRoleAssignment
 
 Grant uses the configured model for every query it makes, including the `roleAssignments` relationship on your user model.
 
-### Column Storage
-
-Applications where each user holds exactly one global role may set `storage` to `column`. In this mode, Grant stores the role in a `role` column on the users table instead of the `role_assignments` table:
-
-```php
-'storage' => 'column',
-```
-
-You are responsible for adding a nullable `role` string column in your own migration. Casting the column to your `Role` enum is supported.
-
-> [!WARNING]
-> Column storage supports a single global role per user. Granting multiple roles or a scoped role will throw an `InvalidArgumentException`.
-
 ### UUID and ULID Keys
 
 The published migration uses `foreignId` for the user and `nullableMorphs` for the scope. If your users use UUID or ULID primary keys, change the user column to `foreignUuid` or `foreignUlid`. If your scopes do, change the scope columns to `nullableUuidMorphs` or `nullableUlidMorphs`. Make these edits before running the migration.
@@ -426,19 +427,22 @@ php artisan grant:list
 php artisan grant:show 1
 php artisan grant:show 1 --on='App\Models\Team:5'
 
-# Add a case to the configured enum...
-php artisan make:permission PublishPosts
-php artisan make:role Publisher
-
 # Remap or delete stored roles that no longer match the enum...
 php artisan grant:sync
 ```
 
-The `make:permission` and `make:role` commands append a kebab-cased, string-backed case to the configured enum. If the enum does not exist yet, it is generated from the stub. After adding a role, remember to map its permissions in `Role::permissions`.
+To add a permission or role, add a case to the enum. After adding a role, remember to map its permissions in `Role::permissions`.
 
 ## Testing
 
-Grant registers a `role` state on every Eloquent factory, allowing you to create models with roles already assigned:
+To create users with roles already assigned, add a state to your `UserFactory` that grants the role after creation:
+
+```php
+public function role(Role $role, ?Model $on = null): static
+{
+    return $this->afterCreating(fn (User $user) => $user->grant($role, $on));
+}
+```
 
 ```php
 $editor = User::factory()->role(Role::Editor)->create();

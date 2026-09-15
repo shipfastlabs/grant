@@ -21,10 +21,9 @@ final class SyncCommand extends Command
     {
         $roleClass = $grant->roleClass();
         $known = array_map(static fn (Role $role): string => $role->value, $roleClass::cases());
-        $column = config('grant.storage') === 'column';
-        $model = $this->storedModel($grant, $column);
+        $model = $grant->assignmentModel();
 
-        $orphans = $model::query()->whereNotNull('role')->whereNotIn('role', $known)->distinct()->pluck('role')
+        $orphans = $model::query()->whereNotIn('role', $known)->distinct()->pluck('role')
             ->filter(static fn (mixed $role): bool => is_string($role));
 
         if ($orphans->isEmpty()) {
@@ -47,18 +46,14 @@ final class SyncCommand extends Command
                 [...array_combine($known, $known), '__delete' => 'Delete them'],
             );
 
-            if ($column) {
-                $model::query()->where('role', $orphan)->update(['role' => $choice === '__delete' ? null : $choice]);
-            } else {
-                foreach ($model::query()->where('role', $orphan)->cursor() as $row) {
-                    if ($choice === '__delete' || $this->alreadyHolds($model, $row, $choice)) {
-                        $row->delete();
+            foreach ($model::query()->where('role', $orphan)->cursor() as $row) {
+                if ($choice === '__delete' || $this->alreadyHolds($model, $row, $choice)) {
+                    $row->delete();
 
-                        continue;
-                    }
-
-                    $row->forceFill(['role' => $choice])->save();
+                    continue;
                 }
+
+                $row->forceFill(['role' => $choice])->save();
             }
 
             $this->components->info($choice === '__delete'
@@ -78,21 +73,5 @@ final class SyncCommand extends Command
             ->where('scopeable_type', $row->getAttribute('scopeable_type'))
             ->where('scopeable_id', $row->getAttribute('scopeable_id'))
             ->exists();
-    }
-
-    /** @return class-string<Model> */
-    private function storedModel(Grant $grant, bool $column): string
-    {
-        if (! $column) {
-            return $grant->assignmentModel();
-        }
-
-        $userClass = config('auth.providers.users.model');
-
-        if (! is_string($userClass) || ! is_subclass_of($userClass, Model::class)) {
-            $this->fail('The auth user model could not be resolved.');
-        }
-
-        return $userClass;
     }
 }
