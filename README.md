@@ -39,7 +39,7 @@
 
 ## Introduction
 
-Grant provides minimal, enum-first roles and permissions for Laravel. Permissions are a PHP enum, roles are a PHP enum, assignments belong to any Eloquent model, and every authorization check uses Laravel's native Gate:
+Grant provides minimal, enum-first roles and permissions for Laravel. Permissions are a PHP enum, roles are a PHP enum, assignments are stored per user and may be scoped to any Eloquent model, and every authorization check uses Laravel's native Gate:
 
 ```php
 $user->grant(Role::Editor);
@@ -67,7 +67,7 @@ php artisan grant:install
 php artisan migrate
 ```
 
-Finally, add the `Shipfastlabs\Grant\HasRoles` trait to your `User` model, or to any Eloquent model that should hold roles.
+Finally, add the `Shipfastlabs\Grant\HasRoles` trait to the user model configured in `auth.providers.users.model`.
 
 ### Publishing Resources
 
@@ -238,7 +238,7 @@ $user->roles(); // Collection<Role>
 $user->permissions(); // Collection<Permission>
 ```
 
-Permissions are always derived from roles at call time, so there is nothing to cache or invalidate. Enum values are the ability strings, which makes them convenient to share with your frontend:
+Permissions are always derived from the enum definitions at call time, so only assignments are read from the database. Enum values are the ability strings, which makes them convenient to share with your frontend:
 
 ```php
 'permissions' => $user->permissions()->map->value,
@@ -362,7 +362,7 @@ public function update(User $user, Post $post): bool
 }
 ```
 
-The Gate arguments are forwarded to the permission check, so `#[Requires]` honors roles scoped to the policy's model.
+The Gate arguments are forwarded to the permission check, so `#[Requires]` honors roles scoped to the policy's model. When the permission is missing, the denial carries that permission's `deniedMessage`.
 
 ### Super Admins
 
@@ -372,7 +372,7 @@ You may designate one role as a super admin in your configuration file. Users ho
 'super_admin' => App\Enums\Role::Admin,
 ```
 
-Set the option to `null` to disable the bypass entirely.
+Set the option to `null` to disable the bypass entirely. Any other value that is not a case of your role enum throws an `InvalidConfigurationException`.
 
 Only a globally granted super admin role bypasses the Gate. Granting the role scoped to a model, such as `on: $team`, makes the user an ordinary holder of that role's permissions on that team.
 

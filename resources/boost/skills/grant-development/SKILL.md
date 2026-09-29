@@ -23,7 +23,7 @@ Apply `shipfastlabs/grant` while keeping every authorization check in Laravel's 
 4. Add `Shipfastlabs\Grant\HasRoles` to the auth user model configured in `auth.providers.users.model`.
 5. Assign with `grant`, `revoke`, or `syncRoles`; the user must be persisted, and `on:` accepts another persisted model as the scope.
 6. Check only with `can()`, `Gate`, `@can`, `can:` middleware, Form Requests, or Policies.
-7. Use `#[Requires(Permission::...)]` on a policy method when capability and model-context checks should compose.
+7. Use `#[Requires(Permission::...)]` on a policy method when capability and model-context checks should compose; a denial carries that permission's `deniedMessage()`.
 
 ## References
 

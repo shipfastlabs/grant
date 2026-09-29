@@ -44,44 +44,51 @@ final class GrantServiceProvider extends ServiceProvider
         $gate = $this->app->make(Gate::class);
         $grant = $this->app->make(Grant::class);
 
-        $this->flushOnWrite($grant);
-        $this->defineAbilities($gate, $grant);
-        $this->allowSuperAdmin($gate, $grant);
+        $this->flushOnWrite($grant->assignmentModel());
+        $this->defineAbilities($gate, $grant->permissionClass());
+        $this->allowSuperAdmin($gate);
         $this->enforcePolicyAttributes($gate);
     }
 
-    private function flushOnWrite(Grant $grant): void
+    /** @param class-string<Model> $model */
+    private function flushOnWrite(string $model): void
     {
-        $flush = static function (Model $row) use ($grant): void {
-            $id = $row->getAttribute('user_id');
+        $flush = static function (Model $row): void {
+            $grant = app(Grant::class);
 
-            $grant->flush(is_int($id) || is_string($id) ? $id : null);
+            foreach ([$row->getAttribute('user_id'), $row->getOriginal('user_id')] as $id) {
+                if (is_int($id) || is_string($id)) {
+                    $grant->flush($id);
+                }
+            }
         };
 
-        $grant->assignmentModel()::saved($flush);
-        $grant->assignmentModel()::deleted($flush);
+        $model::saved($flush);
+        $model::deleted($flush);
     }
 
-    private function defineAbilities(Gate $gate, Grant $grant): void
+    /** @param class-string<Ability> $permissions */
+    private function defineAbilities(Gate $gate, string $permissions): void
     {
-        foreach ($grant->permissionClass()::cases() as $permission) {
-            $gate->define($permission, static function (object $user, mixed ...$arguments) use ($grant, $permission): Response {
+        foreach ($permissions::cases() as $permission) {
+            $gate->define($permission, static function (object $user, mixed ...$arguments) use ($permission): Response {
                 $scope = $arguments[0] ?? null;
                 $scope = $scope instanceof Model && $scope->exists ? $scope : null;
 
                 $allowed = $user instanceof Model
                     && $user->exists
-                    && $grant->permissions($user, $scope)->containsStrict($permission);
+                    && app(Grant::class)->permissions($user, $scope)->containsStrict($permission);
 
                 return $allowed ? Response::allow() : Response::deny($permission->deniedMessage());
             });
         }
     }
 
-    private function allowSuperAdmin(Gate $gate, Grant $grant): void
+    private function allowSuperAdmin(Gate $gate): void
     {
-        $gate->before(static function (object $user) use ($grant): ?bool {
-            $superAdmin = config('grant.super_admin');
+        $gate->before(static function (object $user): ?bool {
+            $grant = app(Grant::class);
+            $superAdmin = $grant->superAdmin();
 
             $isSuperAdmin = $superAdmin instanceof Role
                 && $user instanceof Model
@@ -94,7 +101,7 @@ final class GrantServiceProvider extends ServiceProvider
 
     private function enforcePolicyAttributes(Gate $gate): void
     {
-        $gate->before(static function (?object $user, string $ability, array $arguments) use ($gate): ?bool {
+        $gate->before(static function (?object $user, string $ability, array $arguments) use ($gate): ?Response {
             $subject = $arguments[0] ?? null;
 
             if (! is_object($subject) && ! is_string($subject)) {
@@ -115,7 +122,9 @@ final class GrantServiceProvider extends ServiceProvider
                 return null;
             }
 
-            return $gate->forUser($user)->allows($required, $arguments) ? null : false;
+            $response = $gate->forUser($user)->inspect($required, $arguments);
+
+            return $response->allowed() ? null : $response;
         });
     }
 
