@@ -16,6 +16,11 @@ final class InvalidConfigurationException extends GrantException
         return new self(sprintf('The [grant.%s] enum must be string-backed.', $key));
     }
 
+    public static function superAdmin(string $roleClass): self
+    {
+        return new self(sprintf('The [grant.super_admin] config value must be null or a case of [%s].', $roleClass));
+    }
+
     public static function model(string $expected): self
     {
         return new self(sprintf('The [grant.model] config value must be [%s] or a subclass.', $expected));

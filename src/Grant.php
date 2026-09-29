@@ -30,7 +30,9 @@ final class Grant
 
     public function revoke(Model $user, Role $role, ?Model $on = null): Model
     {
-        $this->assignmentQuery($user, $on)->where('role', $role->value)->delete();
+        foreach ($this->assignmentQuery($user, $on)->where('role', $role->value)->get() as $assignment) {
+            $assignment->delete();
+        }
 
         $this->flush($user);
 
@@ -42,12 +44,18 @@ final class Grant
     {
         $rows = collect([...$roles])
             ->unique(static fn (Role $role): string => $role->value)
-            ->map(fn (Role $role): array => $this->assignmentAttributes($user, $role, $on))
-            ->all();
+            ->map(fn (Role $role): array => $this->assignmentAttributes($user, $role, $on));
 
         $user->getConnection()->transaction(function () use ($user, $rows, $on): void {
-            $this->assignmentQuery($user, $on)->delete();
-            $this->assignmentModel()::query()->insert($rows);
+            $stale = $this->assignmentQuery($user, $on)->whereNotIn('role', $rows->pluck('role')->all())->get();
+
+            foreach ($stale as $assignment) {
+                $assignment->delete();
+            }
+
+            foreach ($rows as $row) {
+                $this->assignmentModel()::query()->firstOrCreate($row);
+            }
         });
 
         $this->flush($user);
@@ -102,6 +110,23 @@ final class Grant
     public function permissionClass(): string
     {
         return $this->enumClass('permissions', Ability::class);
+    }
+
+    public function superAdmin(): ?Role
+    {
+        $role = config('grant.super_admin');
+
+        if ($role === null) {
+            return null;
+        }
+
+        $roleClass = $this->roleClass();
+
+        if (! $role instanceof $roleClass) {
+            throw InvalidConfigurationException::superAdmin($roleClass);
+        }
+
+        return $role;
     }
 
     /** @return class-string<RoleAssignment> */

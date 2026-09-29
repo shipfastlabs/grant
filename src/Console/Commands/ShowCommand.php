@@ -6,6 +6,7 @@ namespace Shipfastlabs\Grant\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Shipfastlabs\Grant\Ability;
 use Shipfastlabs\Grant\Grant;
 use Shipfastlabs\Grant\Role;
@@ -34,12 +35,27 @@ final class ShowCommand extends Command
         );
         $scope = $this->resolveScope($this->option('on'));
 
-        $this->table([], [
-            ['Roles', $grant->roles($user, $scope)->map(static fn (Role $role): string => $role->value)->join(', ') ?: 'None'],
-            ['Permissions', $grant->permissions($user, $scope)->map(static fn (Ability $ability): string => $ability->value)->join(', ') ?: 'None'],
-        ]);
+        $rows = [['Roles', $this->format($grant->roles($user))]];
+
+        if ($scope instanceof Model) {
+            $rows[] = ['Scoped roles', $this->format($grant->roles($user, $scope))];
+        }
+
+        $rows[] = ['Permissions', $this->format($grant->permissions($user, $scope))];
+
+        $this->table([], $rows);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @template TValue of Role|Ability
+     *
+     * @param  Collection<int, TValue>  $values
+     */
+    private function format(Collection $values): string
+    {
+        return $values->map(static fn (Role|Ability $value): string => $value->value)->join(', ') ?: 'None';
     }
 
     private function resolveScope(mixed $scope): ?Model

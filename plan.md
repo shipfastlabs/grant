@@ -26,8 +26,8 @@ Permissions are an enum. Roles are an enum. Assignments are a table. Checks are 
 | One migration | `role_assignments` table with a `user_id` foreign key and nullable polymorphic scope, backed by a configurable `RoleAssignment` model |
 | `#[Requires]` attribute | Policy-method gate, wired via reflection |
 | Testing helpers | Factory state, `assertCan` / `assertCannot`, `withRole()` |
-| Artisan | `grant:install`, `grant:list`, `grant:show {user}`, `grant:sync`, `make:permission`, `make:role` |
-| Config | One file, five keys |
+| Artisan | `grant:install`, `grant:list`, `grant:show {user}`, `grant:sync` |
+| Config | One file, four keys |
 
 ## Data model
 
@@ -43,8 +43,6 @@ role_assignments
 
 No `roles` table. No `permissions` table. No `role_has_permissions`. No cache table.
 
-Optional `column` mode: a single `role` column on `users` for single-role apps.
-
 ## Config
 
 ```php
@@ -53,7 +51,7 @@ return [
     'roles'       => App\Enums\Role::class,
     'permissions' => App\Enums\Permission::class,
     'super_admin' => App\Enums\Role::Admin,   // or null
-    'storage'     => 'pivot',                 // 'pivot' | 'column'
+    'model'       => Shipfastlabs\Grant\Models\RoleAssignment::class,
 ];
 ```
 
@@ -218,12 +216,10 @@ $this->actingAs($user)->withRole(Role::Admin);
 ## Artisan
 
 ```
-php artisan grant:install           # config, migration, enums via make:permission / make:role
+php artisan grant:install           # config, migration, starter enums
 php artisan grant:list              # Gate::abilities() filtered to the enum
 php artisan grant:show {user}        # roles + resolved permissions, optional --on=
 php artisan grant:sync              # remap or delete stored roles missing from the enum
-php artisan make:permission Name    # adds a case to Permission enum
-php artisan make:role Name          # adds a case to Role enum
 ```
 
 ## Deliberately excluded
@@ -237,7 +233,7 @@ php artisan make:role Name          # adds a case to Role enum
 | Multi-guard | Default guard only; document as out of scope |
 | `role:` middleware, `@role` directive | Roles are not check targets |
 | Model / instance abilities, ownership, forbids | Policies do this better |
-| Caching layer | Nothing to cache beyond one eager-loaded relationship |
+| Cross-request cache | Assignments are memoized per request; nothing else to cache |
 | Custom runtime roles | Point to Spatie; optional future add-on |
 
 ## API directions explored
@@ -286,7 +282,7 @@ Reads well but introduces a DSL and a facade-based check API, which violates opi
 | Native PHP enums | partial | no | no | yes | yes |
 | Scoped / team roles | opt-in flag, decide before migrating | scopes | `of()` | no | nullable scope, always on |
 | Gate integration | `before` hook | `before` hook | weak | weak | `define` per ability + `before` for super admin |
-| Cache | 24h, manual flush | yes | no | no | none |
+| Cache | 24h, manual flush | yes | no | no | per request |
 | Policy attribute | no | no | no | no | yes |
 | Runtime-editable roles | yes | yes | no | no | no (by design) |
 | Maintained | yes | yes | no (2022) | low | you |

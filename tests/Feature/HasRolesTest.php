@@ -158,3 +158,54 @@ it('allows a configured super admin before every other ability', function (): vo
 
     expect(Gate::forUser($user)->allows('undefined-ability'))->toBeTrue();
 });
+
+it('keeps Gate checks current after scoped instances are reset between jobs', function (): void {
+    $user = User::query()->create(['name' => 'Taylor']);
+    $user->grant(Role::Editor);
+
+    expect(Gate::forUser($user)->allows(Permission::EditPosts))->toBeTrue();
+
+    app()->forgetScopedInstances();
+    $user->revoke(Role::Editor);
+
+    expect(Gate::forUser($user)->allows(Permission::EditPosts))->toBeFalse();
+});
+
+it('writes through the assignment model and keeps unchanged rows when syncing', function (): void {
+    $user = User::query()->create(['name' => 'Taylor']);
+    $user->grant(Role::Editor)->grant(Role::Viewer);
+    $editorId = RoleAssignment::query()->where('role', 'editor')->value('id');
+    $deleted = [];
+
+    RoleAssignment::deleted(static function (RoleAssignment $assignment) use (&$deleted): void {
+        $deleted[] = $assignment->getAttribute('role');
+    });
+
+    $user->syncRoles([Role::Editor, Role::Admin]);
+    $user->revoke(Role::Admin);
+
+    expect($deleted)->toBe(['viewer', 'admin'])
+        ->and(RoleAssignment::query()->where('role', 'editor')->value('id'))->toBe($editorId)
+        ->and($user->roles()->all())->toBe([Role::Editor]);
+});
+
+it('forgets the previous holder when an assignment moves to another user', function (): void {
+    $user = User::query()->create(['name' => 'Taylor']);
+    $other = User::query()->create(['name' => 'Other']);
+    $user->grant(Role::Editor);
+
+    expect($user->roles()->all())->toBe([Role::Editor]);
+
+    RoleAssignment::query()->where('user_id', $user->getKey())->firstOrFail()->update(['user_id' => $other->getKey()]);
+
+    expect($user->roles())->toBeEmpty()
+        ->and($other->roles()->all())->toBe([Role::Editor]);
+});
+
+it('rejects a super admin that is not a case of the role enum', function (): void {
+    config()->set('grant.super_admin', 'admin');
+    $user = User::query()->create(['name' => 'Taylor']);
+
+    expect(fn () => Gate::forUser($user)->allows(Permission::EditPosts))
+        ->toThrow(InvalidConfigurationException::class, 'grant.super_admin');
+});

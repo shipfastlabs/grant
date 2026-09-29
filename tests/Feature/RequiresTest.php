@@ -33,3 +33,10 @@ it('does not recurse when the attribute names the policy ability itself', functi
 
     expect(Gate::forUser($user)->allows('view-reports', new Post))->toBeTrue();
 });
+
+it('denies with the attributed permission’s message', function (): void {
+    $user = User::query()->create(['name' => 'Viewer']);
+    $user->grant(Role::Viewer);
+
+    expect(Gate::forUser($user)->inspect('update', new Post)->message())->toBe('Editor access is required.');
+});

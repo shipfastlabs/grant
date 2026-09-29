@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Shipfastlabs\Grant\Models\RoleAssignment;
 use Shipfastlabs\Grant\Tests\Fixtures\Role;
+use Shipfastlabs\Grant\Tests\Fixtures\Team;
 use Shipfastlabs\Grant\Tests\Fixtures\User;
 
 it('lists registered permission abilities', function (): void {
@@ -82,4 +83,18 @@ it('installs the config, migration, and starter enums', function (): void {
         @unlink(config_path('grant.php'));
         array_map(unlink(...), glob(database_path('migrations/*_create_role_assignments_table.php')) ?: []);
     }
+});
+
+it('shows global and scoped roles separately', function (): void {
+    $user = User::query()->create(['name' => 'Taylor']);
+    $team = Team::query()->create(['name' => 'Laravel']);
+    $user->grant(Role::Editor);
+
+    $this->artisan('grant:show', ['user' => (string) $user->getKey(), '--on' => Team::class.':'.$team->getKey()])
+        ->expectsTable([], [
+            ['Roles', 'editor'],
+            ['Scoped roles', 'None'],
+            ['Permissions', 'edit-posts, delete-posts'],
+        ])
+        ->assertSuccessful();
 });
