@@ -28,6 +28,11 @@ abstract class TestCase extends Orchestra
         $app['config']->set('grant.permissions', Permission::class);
         $app['config']->set('grant.roles', Role::class);
         $app['config']->set('auth.providers.users.model', User::class);
+
+        $sandbox = sys_get_temp_dir().DIRECTORY_SEPARATOR.'grant-testbench-'.getmypid();
+        $app->useAppPath($sandbox.DIRECTORY_SEPARATOR.'app');
+        $app->useConfigPath($sandbox.DIRECTORY_SEPARATOR.'config');
+        $app->useDatabasePath($sandbox.DIRECTORY_SEPARATOR.'database');
     }
 
     protected function defineDatabaseMigrations(): void

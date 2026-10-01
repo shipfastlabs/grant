@@ -7,6 +7,8 @@ use Shipfastlabs\Grant\Tests\Fixtures\Role;
 use Shipfastlabs\Grant\Tests\Fixtures\Team;
 use Shipfastlabs\Grant\Tests\Fixtures\User;
 
+use function Orchestra\Testbench\default_skeleton_path;
+
 it('lists registered permission abilities', function (): void {
     $this->artisan('grant:list')
         ->expectsTable(
@@ -76,7 +78,8 @@ it('installs the config, migration, and starter enums', function (): void {
             ->and(file_get_contents(app_path('Enums/Role.php')))
             ->toContain('enum Role: string implements RoleContract')
             ->toContain('self::Admin => Permission::cases(),')
-            ->and(file_exists(config_path('grant.php')))->toBeTrue();
+            ->and(file_exists(config_path('grant.php')))->toBeTrue()
+            ->and(file_exists(default_skeleton_path().'/config/grant.php'))->toBeFalse();
     } finally {
         @unlink(app_path('Enums/Permission.php'));
         @unlink(app_path('Enums/Role.php'));
